@@ -20,6 +20,7 @@ import { createWorktree } from '@/utils/createWorktree';
 import { getTempData, type NewSessionData } from '@/utils/tempDataStore';
 import { linkTaskToSession } from '@/-zen/model/taskSessionLink';
 import { PermissionMode } from '@/components/PermissionModeSelector';
+import { getDefaultModelForAgent, isValidModelForAgent } from '@/sync/models';
 
 // Simple temporary state for passing selections back from picker screens
 let onMachineSelected: (machineId: string) => void = () => { };
@@ -114,6 +115,7 @@ function NewSessionScreen() {
     const recentMachinePaths = useSetting('recentMachinePaths');
     const lastUsedAgent = useSetting('lastUsedAgent');
     const lastUsedPermissionMode = useSetting('lastUsedPermissionMode');
+    const lastUsedModel = useSetting('lastUsedModelMode');
     const experimentsEnabled = useSetting('experiments');
 
     //
@@ -278,6 +280,32 @@ function NewSessionScreen() {
     }, []);
 
     //
+    // Model selection
+    //
+
+    const [selectedModel, setSelectedModel] = React.useState<string>(() => {
+        // Initialize with last used model if valid for current agent, otherwise use default
+        if (lastUsedModel && isValidModelForAgent(lastUsedModel, agentType)) {
+            return lastUsedModel;
+        }
+        return getDefaultModelForAgent(agentType).id;
+    });
+
+    // Reset model when agent type changes
+    React.useEffect(() => {
+        // When agent changes, check if current model is valid for the new agent
+        if (!isValidModelForAgent(selectedModel, agentType)) {
+            setSelectedModel(getDefaultModelForAgent(agentType).id);
+        }
+    }, [agentType, selectedModel]);
+
+    const handleModelChange = React.useCallback((modelId: string) => {
+        setSelectedModel(modelId);
+        // Save the new selection immediately
+        sync.applySettings({ lastUsedModelMode: modelId });
+    }, []);
+
+    //
     // Path selection
     //
 
@@ -384,6 +412,9 @@ function NewSessionScreen() {
 
                 // Set permission mode on the session
                 storage.getState().updateSessionPermissionMode(result.sessionId, permissionMode);
+                
+                // Set selected model on the session
+                storage.getState().updateSessionModel(result.sessionId, selectedModel);
 
                 // Send message
                 await sync.sendMessage(result.sessionId, input);
@@ -412,7 +443,7 @@ function NewSessionScreen() {
         } finally {
             setIsSending(false);
         }
-    }, [agentType, selectedMachineId, selectedPath, input, recentMachinePaths, sessionType, experimentsEnabled, permissionMode]);
+    }, [agentType, selectedMachineId, selectedPath, input, recentMachinePaths, sessionType, experimentsEnabled, permissionMode, selectedModel]);
 
     return (
         <KeyboardAvoidingView
@@ -456,6 +487,8 @@ function NewSessionScreen() {
                     isSending={isSending}
                     agentType={agentType}
                     onAgentClick={handleAgentClick}
+                    selectedModel={selectedModel}
+                    onModelChange={handleModelChange}
                     machineName={selectedMachine?.metadata?.displayName || selectedMachine?.metadata?.host || null}
                     onMachineClick={handleMachineClick}
                     permissionMode={permissionMode}

@@ -225,9 +225,9 @@ class Sync {
             return;
         }
 
-        // Read permission mode and model mode from session state
+        // Read permission mode and model from session state
         const permissionMode = session.permissionMode || 'default';
-        const modelMode = session.modelMode || 'default';
+        const selectedModel = session.selectedModel || null;
 
         // Generate local ID
         const localId = randomUUID();
@@ -249,8 +249,8 @@ class Sync {
             sentFrom = 'web'; // fallback
         }
 
-        // Model settings - models are configured in CLI settings
-        const model: string | null = null;
+        // Model settings - use session's selected model
+        const model: string | null = selectedModel;
         const fallbackModel: string | null = null;
 
         // Create user message content with metadata

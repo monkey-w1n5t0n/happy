@@ -5,7 +5,7 @@ import { Image } from 'expo-image';
 import { layout } from './layout';
 import { MultiTextInput, KeyPressEvent } from './MultiTextInput';
 import { Typography } from '@/constants/Typography';
-import { PermissionMode, ModelMode } from './PermissionModeSelector';
+import { PermissionMode } from './PermissionModeSelector';
 import { hapticsLight, hapticsError } from './haptics';
 import { Shaker, ShakeInstance } from './Shaker';
 import { StatusDot } from './StatusDot';
@@ -21,6 +21,7 @@ import { useSetting } from '@/sync/storage';
 import { Theme } from '@/theme';
 import { t } from '@/text';
 import { Metadata } from '@/sync/storageTypes';
+import { ModelInfo, getModelsForAgent, getModelById } from '@/sync/models';
 
 interface AgentInputProps {
     value: string;
@@ -33,8 +34,8 @@ interface AgentInputProps {
     isMicActive?: boolean;
     permissionMode?: PermissionMode;
     onPermissionModeChange?: (mode: PermissionMode) => void;
-    modelMode?: ModelMode;
-    onModelModeChange?: (mode: ModelMode) => void;
+    selectedModel?: string | null;
+    onModelChange?: (modelId: string) => void;
     metadata?: Metadata | null;
     onAbort?: () => void | Promise<void>;
     showAbortButton?: boolean;
@@ -293,6 +294,24 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     // Check if this is a Codex or Gemini session
     const isCodex = props.metadata?.flavor === 'codex';
     const isGemini = props.metadata?.flavor === 'gemini';
+    
+    // Determine agent type for model selection
+    const agentTypeForModels: 'claude' | 'codex' | 'gemini' = 
+        props.agentType || (isCodex ? 'codex' : isGemini ? 'gemini' : 'claude');
+    
+    // Get available models for the current agent
+    const availableModels = React.useMemo(() => 
+        getModelsForAgent(agentTypeForModels), 
+        [agentTypeForModels]
+    );
+    
+    // Get current model info
+    const currentModel = React.useMemo(() => {
+        if (props.selectedModel) {
+            return getModelById(props.selectedModel);
+        }
+        return availableModels.find(m => m.isDefault) || availableModels[0] || null;
+    }, [props.selectedModel, availableModels]);
 
     // Calculate context warning
     const contextWarning = props.usageData?.contextSize
@@ -380,6 +399,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         props.onPermissionModeChange?.(mode);
         // Don't close the settings overlay - let users see the change and potentially switch again
     }, [props.onPermissionModeChange]);
+
+    // Handle model selection
+    const handleModelSelect = React.useCallback((modelId: string) => {
+        hapticsLight();
+        props.onModelChange?.(modelId);
+    }, [props.onModelChange]);
 
     // Handle abort button press
     const handleAbortPress = React.useCallback(async () => {
@@ -591,15 +616,61 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     }}>
                                         {t('agentInput.model.title')}
                                     </Text>
-                                    <Text style={{
-                                        fontSize: 13,
-                                        color: theme.colors.textSecondary,
-                                        paddingHorizontal: 16,
-                                        paddingVertical: 8,
-                                        ...Typography.default()
-                                    }}>
-                                        {t('agentInput.model.configureInCli')}
-                                    </Text>
+                                    {props.onModelChange ? (
+                                        availableModels.map((model) => {
+                                            const isSelected = currentModel?.id === model.id;
+                                            return (
+                                                <Pressable
+                                                    key={model.id}
+                                                    onPress={() => handleModelSelect(model.id)}
+                                                    style={({ pressed }) => ({
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        paddingHorizontal: 16,
+                                                        paddingVertical: 8,
+                                                        backgroundColor: pressed ? theme.colors.surfacePressed : 'transparent'
+                                                    })}
+                                                >
+                                                    <View style={{
+                                                        width: 16,
+                                                        height: 16,
+                                                        borderRadius: 8,
+                                                        borderWidth: 2,
+                                                        borderColor: isSelected ? theme.colors.radio.active : theme.colors.radio.inactive,
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        marginRight: 12
+                                                    }}>
+                                                        {isSelected && (
+                                                            <View style={{
+                                                                width: 6,
+                                                                height: 6,
+                                                                borderRadius: 3,
+                                                                backgroundColor: theme.colors.radio.dot
+                                                            }} />
+                                                        )}
+                                                    </View>
+                                                    <Text style={{
+                                                        fontSize: 14,
+                                                        color: isSelected ? theme.colors.radio.active : theme.colors.text,
+                                                        ...Typography.default()
+                                                    }}>
+                                                        {model.name}
+                                                    </Text>
+                                                </Pressable>
+                                            );
+                                        })
+                                    ) : (
+                                        <Text style={{
+                                            fontSize: 13,
+                                            color: theme.colors.textSecondary,
+                                            paddingHorizontal: 16,
+                                            paddingVertical: 8,
+                                            ...Typography.default()
+                                        }}>
+                                            {t('agentInput.model.configureInCli')}
+                                        </Text>
+                                    )}
                                 </View>
                             </FloatingOverlay>
                         </View>
@@ -760,6 +831,39 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         ...Typography.default('semiBold'),
                                     }}>
                                         {props.agentType === 'claude' ? t('agentInput.agent.claude') : props.agentType === 'codex' ? t('agentInput.agent.codex') : t('agentInput.agent.gemini')}
+                                    </Text>
+                                </Pressable>
+                            )}
+
+                            {/* Model selector button */}
+                            {props.onModelChange && currentModel && (
+                                <Pressable
+                                    onPress={handleSettingsPress}
+                                    hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                    style={(p) => ({
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        borderRadius: Platform.select({ default: 16, android: 20 }),
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 6,
+                                        justifyContent: 'center',
+                                        height: 32,
+                                        opacity: p.pressed ? 0.7 : 1,
+                                        gap: 6,
+                                    })}
+                                >
+                                    <Octicons
+                                        name="package"
+                                        size={14}
+                                        color={theme.colors.button.secondary.tint}
+                                    />
+                                    <Text style={{
+                                        fontSize: 13,
+                                        color: theme.colors.button.secondary.tint,
+                                        fontWeight: '600',
+                                        ...Typography.default('semiBold'),
+                                    }}>
+                                        {currentModel.shortName}
                                     </Text>
                                 </Pressable>
                             )}

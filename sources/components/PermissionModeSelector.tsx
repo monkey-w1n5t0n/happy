@@ -6,8 +6,6 @@ import { hapticsLight } from './haptics';
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'read-only' | 'safe-yolo' | 'yolo';
 
-export type ModelMode = 'default';
-
 interface PermissionModeSelectorProps {
     mode: PermissionMode;
     onModeChange: (mode: PermissionMode) => void;
