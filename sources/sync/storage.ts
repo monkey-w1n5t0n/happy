@@ -117,7 +117,7 @@ interface StorageState {
     getActiveSessions: () => Session[];
     updateSessionDraft: (sessionId: string, draft: string | null) => void;
     updateSessionPermissionMode: (sessionId: string, mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'read-only' | 'safe-yolo' | 'yolo') => void;
-    updateSessionModelMode: (sessionId: string, mode: 'default') => void;
+    updateSessionModel: (sessionId: string, modelId: string | null) => void;
     // Artifact methods
     applyArtifacts: (artifacts: DecryptedArtifact[]) => void;
     addArtifact: (artifact: DecryptedArtifact) => void;
@@ -808,20 +808,20 @@ export const storage = create<StorageState>()((set, get) => {
                 sessions: updatedSessions
             };
         }),
-        updateSessionModelMode: (sessionId: string, mode: 'default') => set((state) => {
+        updateSessionModel: (sessionId: string, modelId: string | null) => set((state) => {
             const session = state.sessions[sessionId];
             if (!session) return state;
 
-            // Update the session with the new model mode
+            // Update the session with the new model
             const updatedSessions = {
                 ...state.sessions,
                 [sessionId]: {
                     ...session,
-                    modelMode: mode
+                    selectedModel: modelId
                 }
             };
 
-            // No need to rebuild sessionListViewData since model mode doesn't affect the list display
+            // No need to rebuild sessionListViewData since model doesn't affect the list display
             return {
                 ...state,
                 sessions: updatedSessions

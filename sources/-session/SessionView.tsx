@@ -168,6 +168,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const shouldShowCliWarning = isCliOutdated && !isAcknowledged;
     // Get permission mode from session object, default to 'default'
     const permissionMode = session.permissionMode || 'default';
+    // Get selected model from session object
+    const selectedModel = session.selectedModel || null;
     const sessionStatus = useSessionStatus(session);
     const sessionUsage = useSessionUsage(sessionId);
     const alwaysShowContextSize = useSetting('alwaysShowContextSize');
@@ -191,6 +193,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     // Function to update permission mode
     const updatePermissionMode = React.useCallback((mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'read-only' | 'safe-yolo' | 'yolo') => {
         storage.getState().updateSessionPermissionMode(sessionId, mode);
+    }, [sessionId]);
+
+    // Function to update selected model
+    const updateSelectedModel = React.useCallback((modelId: string) => {
+        storage.getState().updateSessionModel(sessionId, modelId);
     }, [sessionId]);
 
     // Memoize header-dependent styles to prevent re-renders
@@ -272,6 +279,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             sessionId={sessionId}
             permissionMode={permissionMode}
             onPermissionModeChange={updatePermissionMode}
+            selectedModel={selectedModel}
+            onModelChange={updateSelectedModel}
             metadata={session.metadata}
             connectionStatus={{
                 text: sessionStatus.statusText,
