@@ -297,7 +297,7 @@ function NewSessionScreen() {
         if (!isValidModelForAgent(selectedModel, agentType)) {
             setSelectedModel(getDefaultModelForAgent(agentType).id);
         }
-    }, [agentType]);
+    }, [agentType, selectedModel]);
 
     const handleModelChange = React.useCallback((modelId: string) => {
         setSelectedModel(modelId);
